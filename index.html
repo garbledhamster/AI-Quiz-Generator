@@ -1,16 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>AI Quiz Generator</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+
 <header class="topbar">
   <div class="wrap topbar__inner">
     <div class="brand">
       <div class="brand__logo">Q</div>
       <div class="brand__text">
         <div class="brand__title">AI Quiz Generator</div>
-        <div class="brand__sub">Encrypted local vault • Slides • Submit + grade</div>
+        <div class="brand__sub">Local encrypted vault • Generate → Take quiz → Submit</div>
       </div>
     </div>
 
     <div class="topbar__actions">
-      <button id="openSettingsBtn" class="btn btn--ghost">Settings</button>
-      <button id="openLibraryBtn" class="btn btn--ghost">Quizzes</button>
+      <button id="navGenerateBtn" class="btn btn--ghost" disabled>Generate</button>
+      <button id="navQuizBtn" class="btn btn--ghost" disabled>Quiz</button>
+      <button id="openSettingsBtn" class="btn btn--ghost" disabled>Settings</button>
+      <button id="openLibraryBtn" class="btn btn--ghost" disabled>Quizzes</button>
       <button id="lockBtn" class="btn btn--ghost" hidden>Lock</button>
       <button id="resetBtn" class="btn btn--danger">Reset</button>
     </div>
@@ -19,7 +31,6 @@
 
 <div id="drawerOverlay" class="overlay" hidden></div>
 
-<!-- SETTINGS DRAWER -->
 <aside id="settingsDrawer" class="drawer drawer--left" aria-hidden="true">
   <div class="drawer__header">
     <div>
@@ -29,7 +40,7 @@
     <button id="closeSettingsBtn" class="btn btn--ghost">✕</button>
   </div>
 
-  <div class="card card--flat">
+  <div class="panel">
     <div class="field">
       <label for="apiKey">API key</label>
       <input id="apiKey" type="password" autocomplete="off" placeholder="sk-..." />
@@ -43,6 +54,7 @@
           <option value="easy">easy</option>
           <option value="medium" selected>medium</option>
           <option value="hard">hard</option>
+          <option value="very_hard">very hard</option>
         </select>
       </div>
 
@@ -52,6 +64,8 @@
           <option value="4" selected>4</option>
           <option value="5">5</option>
           <option value="6">6</option>
+          <option value="7">7</option>
+          <option value="8">8</option>
         </select>
       </div>
     </div>
@@ -59,11 +73,6 @@
     <div class="field">
       <label for="model">Model</label>
       <select id="model"></select>
-    </div>
-
-    <div class="field">
-      <label for="endpoint">Endpoint</label>
-      <input id="endpoint" type="text" placeholder="https://api.openai.com/v1/responses" />
     </div>
 
     <div class="grid grid--2">
@@ -77,6 +86,19 @@
       </div>
     </div>
 
+    <div class="field">
+      <label for="endpoint">Endpoint</label>
+      <input id="endpoint" type="text" value="https://api.openai.com/v1/responses" />
+    </div>
+
+    <div class="field">
+      <label class="check">
+        <input type="checkbox" id="immediateFeedback" />
+        <span>Show correctness after each answer</span>
+      </label>
+      <div class="muted small">If off: correctness only after Submit (answer sheet at end).</div>
+    </div>
+
     <div class="row">
       <button id="saveSettingsBtn" class="btn btn--primary btn--block">Save settings</button>
     </div>
@@ -85,7 +107,6 @@
   </div>
 </aside>
 
-<!-- QUIZ LIBRARY DRAWER -->
 <aside id="libraryDrawer" class="drawer drawer--right" aria-hidden="true">
   <div class="drawer__header">
     <div>
@@ -95,16 +116,15 @@
     <button id="closeLibraryBtn" class="btn btn--ghost">✕</button>
   </div>
 
-  <div class="card card--flat">
+  <div class="panel">
     <div id="quizList" class="list"></div>
     <div class="status" id="libraryStatus" aria-live="polite"></div>
   </div>
 </aside>
 
-<!-- LOCK SCREEN -->
 <section id="lockScreen" class="wrap">
-  <div class="card">
-    <div class="card__header">
+  <div class="panel panel--card">
+    <div class="panel__header">
       <h2 id="lockTitle">Unlock</h2>
       <p class="muted" id="lockHint">Enter your master password to decrypt local storage.</p>
     </div>
@@ -127,94 +147,117 @@
         <span>Remember password</span>
       </label>
 
-      <button id="unlockBtn" class="btn btn--primary">Unlock</button>
+      <div class="row">
+        <button id="forgetRememberedBtn" class="btn btn--ghost" hidden>Forget saved</button>
+        <button id="unlockBtn" class="btn btn--primary">Unlock</button>
+      </div>
     </div>
 
     <div class="notice">
-      <strong>Note:</strong> Remembering password reduces security.
+      If you test on different URLs (CodePen vs GitHub Pages), localStorage won’t carry over.
     </div>
 
     <div class="status" id="lockStatus" aria-live="polite"></div>
   </div>
 </section>
 
-<!-- MAIN APP -->
 <main id="app" class="wrap" hidden>
-  <div class="card">
-    <div class="card__header">
-      <h3>Generate Quiz</h3>
-      <p class="muted">Paste text → generate → saved automatically.</p>
-    </div>
 
-    <div class="field">
-      <label for="sourceText">Source text</label>
-      <textarea id="sourceText" rows="10" placeholder="Paste the text you want to quiz yourself on..."></textarea>
-    </div>
-
-    <div class="grid grid--3">
-      <div class="field">
-        <label for="questionCount">Questions</label>
-        <input id="questionCount" type="number" min="1" max="100" value="10" />
+  <section id="viewGenerate">
+    <div class="panel panel--card">
+      <div class="panel__header">
+        <h3>Generate</h3>
+        <p class="muted">Paste text → Generate → auto-saves and switches to Quiz.</p>
       </div>
 
       <div class="field">
-        <label for="quizTitle">Title (optional)</label>
-        <input id="quizTitle" type="text" placeholder="Auto-title if blank" />
+        <label for="sourceText">Source text</label>
+        <textarea id="sourceText" rows="10" placeholder="Paste the text you want to quiz yourself on..."></textarea>
       </div>
 
-      <div class="field">
-        <label>&nbsp;</label>
-        <button id="generateBtn" class="btn btn--primary btn--block">Generate</button>
+      <div class="grid grid--3">
+        <div class="field">
+          <label for="questionCount">Questions</label>
+          <input id="questionCount" type="number" min="1" max="100" value="10" />
+        </div>
+
+        <div class="field">
+          <label for="quizTitle">Title (optional)</label>
+          <input id="quizTitle" type="text" placeholder="Auto-title if blank" />
+        </div>
+
+        <div class="field">
+          <label>&nbsp;</label>
+          <button id="generateBtn" class="btn btn--primary btn--block">Generate</button>
+        </div>
+      </div>
+
+      <div class="status" id="genStatus" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <section id="viewQuiz" hidden>
+    <div id="playerCard" class="panel panel--card" hidden>
+      <div class="panel__header row row--between">
+        <div>
+          <h3 id="playerTitle">Quiz</h3>
+          <div class="muted small" id="playerMeta"></div>
+        </div>
+        <div class="row">
+          <button id="copyQuizBtn" class="btn btn--ghost">Copy</button>
+          <button id="submitBtn" class="btn btn--primary">Submit</button>
+          <button id="scoreBtn" class="btn btn--ghost">Score</button>
+          <button id="saveNowBtn" class="btn btn--ghost">Save</button>
+        </div>
+      </div>
+
+      <div class="player">
+        <div class="player__question">
+          <div class="qhead">
+            <div id="qProgress" class="qprogress">1 / 1</div>
+            <div id="qText" class="qtext"></div>
+          </div>
+
+          <div id="qChoices" class="choices"></div>
+          <div id="qExplain" class="explain" hidden></div>
+
+          <div class="nav">
+            <button id="prevBtn" class="btn">Prev</button>
+            <button id="nextBtn" class="btn btn--primary">Next</button>
+          </div>
+
+          <div class="row row--between addmore">
+            <div class="row">
+              <input id="addCount" type="number" min="1" max="50" value="5" />
+              <button id="addMoreBtn" class="btn">Add questions</button>
+            </div>
+            <div class="status" id="playerStatus" aria-live="polite"></div>
+          </div>
+        </div>
+
+        <div class="player__map">
+          <div class="map__title">Jump</div>
+          <div id="qMap" class="qmap"></div>
+          <div id="scoreBox" class="scorebox" hidden></div>
+          <div id="resultsPanel" class="results" hidden></div>
+        </div>
       </div>
     </div>
 
-    <div class="status" id="genStatus" aria-live="polite"></div>
-  </div>
-
-  <div id="playerCard" class="card" hidden>
-    <div class="card__header row row--between">
-      <div>
-        <h3 id="playerTitle">Quiz</h3>
-        <div class="muted small" id="playerMeta"></div>
+    <div id="quizEmpty" class="panel panel--card">
+      <div class="panel__header">
+        <h3>No quiz loaded</h3>
+        <p class="muted">Generate one or open the Quizzes drawer.</p>
       </div>
       <div class="row">
-        <button id="copyQuizBtn" class="btn btn--ghost">Copy</button>
-        <button id="submitBtn" class="btn btn--primary">Submit</button>
-        <button id="scoreBtn" class="btn btn--ghost">Score</button>
-        <button id="saveNowBtn" class="btn btn--ghost">Save</button>
+        <button id="goGenerateBtn" class="btn btn--primary">Go to Generate</button>
+        <button id="openLibraryBtn2" class="btn">Open Quizzes</button>
       </div>
     </div>
+  </section>
 
-    <div class="player">
-      <div class="player__question">
-        <div class="qhead">
-          <div id="qProgress" class="qprogress">1 / 1</div>
-          <div id="qText" class="qtext"></div>
-        </div>
-
-        <div id="qChoices" class="choices"></div>
-        <div id="qExplain" class="explain"></div>
-
-        <div class="nav">
-          <button id="prevBtn" class="btn">Prev</button>
-          <button id="nextBtn" class="btn btn--primary">Next</button>
-        </div>
-
-        <div class="row row--between addmore">
-          <div class="row">
-            <input id="addCount" type="number" min="1" max="50" value="5" />
-            <button id="addMoreBtn" class="btn">Add questions</button>
-          </div>
-          <div class="status" id="playerStatus" aria-live="polite"></div>
-        </div>
-      </div>
-
-      <div class="player__map">
-        <div class="map__title">Jump to question</div>
-        <div id="qMap" class="qmap"></div>
-        <div id="scoreBox" class="scorebox" hidden></div>
-        <div id="resultsPanel" class="results" hidden></div>
-      </div>
-    </div>
-  </div>
 </main>
+
+<script src="./script.js"></script>
+</body>
+</html>
